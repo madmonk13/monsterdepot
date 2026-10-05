@@ -26,7 +26,11 @@ MOM.World = class {
     }
     this.prerender();
     for (const [tx, ty, kind] of this.destroyed) this.rubble(tx, ty, kind);
-    this.buildObstacleLayer();
+    this.dirty = new Set();     // obstacle tiles needing a terrain-cache redraw
+    this.dirtyRects = [];       // world-space rects (decals) needing a redraw
+    this.shaking = new Set();   // obstacles currently drawn live, not from cache
+    this.terrain = null;
+    this.scale = 0;
   }
 
   // Compact, JSON-safe copy of the terrain for save/restore.
@@ -295,12 +299,7 @@ MOM.World = class {
       i ? c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr) : c.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
     }
     c.fill();
-  }
-
-  drawGround(c, cam, vw, vh) {
-    const sx = Math.max(0, cam.x), sy = Math.max(0, cam.y);
-    const sw = Math.min(this.pw - sx, vw), sh = Math.min(this.ph - sy, vh);
-    if (sw > 0 && sh > 0) c.drawImage(this.groundCv, sx, sy, sw, sh, sx, sy, sw, sh);
+    this.dirtyRects.push([x - r * 1.3, y - r * 1.3, x + r * 1.3, y + r * 1.3]);
   }
 
   drawLiquids(c, cam, vw, vh, t) {
@@ -327,49 +326,76 @@ MOM.World = class {
     }
   }
 
-  // Obstacles are cached in their own world-sized layer and only re-drawn
-  // around tiles that change, instead of re-drawing every tree each frame.
-  buildObstacleLayer() {
-    const cv = document.createElement('canvas');
-    cv.width = this.pw; cv.height = this.ph;
-    this.obsCv = cv;
-    this.dirty = new Set();
-    this.shaking = new Set();
-    const c = cv.getContext('2d');
-    for (let y = 0; y < this.H; y++) for (let x = 0; x < this.W; x++) {
-      const o = this.obs[this.idx(x, y)];
-      if (o) this.drawOb(c, o, x * this.T, y * this.T, x, y);
-    }
+  // ---------- Terrain cache ----------
+  // Ground (with decals and rubble) plus every obstacle, pre-rendered once at
+  // the exact on-screen scale. Each frame is then a single unscaled,
+  // pixel-aligned copy, which stays fast even when the browser rasterizes the
+  // canvas on the CPU (as Firefox does). Changed areas are redrawn locally.
+  setScale(s) {
+    if (this.terrain && Math.abs(s - this.scale) < 1e-6) return;
+    this.scale = s;
+    const cv = this.terrain || document.createElement('canvas');
+    cv.width = Math.ceil(this.pw * s); cv.height = Math.ceil(this.ph * s);
+    this.terrain = cv;
+    this.tctx = cv.getContext('2d', { alpha: false });
+    this.refreshRect(0, 0, this.pw, this.ph);
   }
 
-  // Re-draw the 3x3 tiles around a changed tile. Obstacle art (shadows,
-  // canopies) can spill up to one tile, so neighbours two tiles out are redrawn
-  // clipped to that region.
-  refreshTile(i) {
-    const { T, W } = this, tx = i % W, ty = (i / W) | 0;
-    const c = this.obsCv.getContext('2d');
+  // Redraw a world-space rect of the cache: ground first, then any obstacles
+  // that could overlap it (art spills up to about half a tile).
+  refreshRect(wx0, wy0, wx1, wy1) {
+    const s = this.scale, c = this.tctx, T = this.T;
+    const x0 = Math.max(0, Math.floor(wx0 * s)), y0 = Math.max(0, Math.floor(wy0 * s));
+    const x1 = Math.min(this.terrain.width, Math.ceil(wx1 * s)), y1 = Math.min(this.terrain.height, Math.ceil(wy1 * s));
+    if (x1 <= x0 || y1 <= y0) return;
     c.save();
-    c.beginPath(); c.rect((tx - 1) * T, (ty - 1) * T, T * 3, T * 3); c.clip();
-    c.clearRect((tx - 1) * T, (ty - 1) * T, T * 3, T * 3);
-    for (let y = ty - 2; y <= ty + 2; y++) for (let x = tx - 2; x <= tx + 2; x++) {
-      if (!this.inb(x, y)) continue;
-      const j = this.idx(x, y), o = this.obs[j];
-      if (o && !this.shaking.has(j)) this.drawOb(c, o, x * T, y * T, x, y);
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.beginPath(); c.rect(x0, y0, x1 - x0, y1 - y0); c.clip();
+    c.drawImage(this.groundCv, x0 / s, y0 / s, (x1 - x0) / s, (y1 - y0) / s, x0, y0, x1 - x0, y1 - y0);
+    c.setTransform(s, 0, 0, s, 0, 0);
+    const tx0 = Math.floor(x0 / s / T) - 1, tx1 = Math.floor(x1 / s / T) + 1;
+    const ty0 = Math.floor(y0 / s / T) - 1, ty1 = Math.floor(y1 / s / T) + 1;
+    for (let y = Math.max(0, ty0); y <= Math.min(this.H - 1, ty1); y++) {
+      for (let x = Math.max(0, tx0); x <= Math.min(this.W - 1, tx1); x++) {
+        const j = this.idx(x, y), o = this.obs[j];
+        if (o && !this.shaking.has(j)) this.drawOb(c, o, x * T, y * T, x, y);
+      }
     }
     c.restore();
   }
 
-  drawObstacles(c, cam, vw, vh, t, dt) {
+  // Apply pending changes (damage, destruction, decals) to the cache.
+  flush(dt) {
     for (const i of this.shaking) {
       const o = this.obs[i];
       if (o) o.shake -= dt;
       if (!o || o.shake <= 0) { this.shaking.delete(i); this.dirty.add(i); }
     }
-    for (const i of this.dirty) this.refreshTile(i);
+    const T = this.T;
+    for (const i of this.dirty) {
+      const tx = i % this.W, ty = (i / this.W) | 0;
+      this.refreshRect((tx - 1) * T, (ty - 1) * T, (tx + 2) * T, (ty + 2) * T);
+    }
     this.dirty.clear();
-    const sx = Math.max(0, cam.x), sy = Math.max(0, cam.y);
-    const sw = Math.min(this.pw - sx, vw), sh = Math.min(this.ph - sy, vh);
-    if (sw > 0 && sh > 0) c.drawImage(this.obsCv, sx, sy, sw, sh, sx, sy, sw, sh);
+    for (const r of this.dirtyRects) this.refreshRect(r[0], r[1], r[2], r[3]);
+    this.dirtyRects.length = 0;
+  }
+
+  // True when the cache fully covers a screen-sized area at this offset.
+  covers(ox, oy, w, h) {
+    return ox >= 0 && oy >= 0 && ox + w <= this.terrain.width && oy + h <= this.terrain.height;
+  }
+
+  // Copy the cache to the screen. Caller sets an identity transform; ox/oy are
+  // whole device pixels so no resampling happens.
+  drawTerrain(c, ox, oy, w, h) {
+    const sx = Math.max(0, ox), sy = Math.max(0, oy), dx = sx - ox, dy = sy - oy;
+    const sw = Math.min(this.terrain.width - sx, w - dx), sh = Math.min(this.terrain.height - sy, h - dy);
+    if (sw > 0 && sh > 0) c.drawImage(this.terrain, sx, sy, sw, sh, dx, dy, sw, sh);
+  }
+
+  // Obstacles that were just hit wobble, so they're drawn live on top.
+  drawShaking(c) {
     const T = this.T;
     for (const i of this.shaking) {
       const o = this.obs[i], tx = i % this.W, ty = (i / this.W) | 0;

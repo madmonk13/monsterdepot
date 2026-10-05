@@ -18,7 +18,7 @@
   class Battle {
     constructor(canvas, cfg, hooks) {
       this.cv = canvas;
-      this.c = canvas.getContext('2d');
+      this.c = canvas.getContext('2d', { alpha: false });
       this.cfg = cfg;
       this.hooks = hooks;
       this.mode = cfg.mode;
@@ -34,7 +34,7 @@
       this.pickupT = 7;
       this.fields = {};
       this.miniDirty = true;
-      this.perfMs = 0; this.perfN = 0;
+      this.perfMs = 0; this.perfWork = 0; this.perfN = 0;
       this.quality = 1;
       try { this.quality = clamp(parseFloat(localStorage.getItem(QUALITY_KEY)) || 1, 0.5, 1); } catch (e) {}
 
@@ -215,10 +215,11 @@
       let dt = Math.min(0.05, raw / 1000);
       this.last = now;
       if (this.state !== 'paused') {
-        this.trackPerf(raw);
+        const w0 = performance.now();
         dt *= this.timeScale;
         this.update(dt);
         this.render(dt);
+        this.trackPerf(raw, performance.now() - w0);
         this.pausedDrawn = false;
       } else if (!this.pausedDrawn) {
         // The paused scene is static; draw it once.
@@ -231,13 +232,16 @@
 
     // If frames run consistently slow, step the render resolution down. The
     // setting is remembered so the next battle starts at the right quality.
-    trackPerf(ms) {
+    // Two signals: the frame interval (GPU-bound or slow machines) and our own
+    // per-frame work, which is where drawing time shows up when the browser
+    // rasterizes on the CPU. 9ms of work leaves headroom on 120Hz displays.
+    trackPerf(ms, work) {
       if (ms > 100) return; // tab switch or hitch, not steady load
-      this.perfMs += ms; this.perfN++;
+      this.perfMs += ms; this.perfWork += work; this.perfN++;
       if (this.perfMs < 2000) return;
-      const avg = this.perfMs / this.perfN;
-      this.perfMs = 0; this.perfN = 0;
-      if (avg > 20 && this.quality > 0.55) {
+      const avg = this.perfMs / this.perfN, avgWork = this.perfWork / this.perfN;
+      this.perfMs = 0; this.perfWork = 0; this.perfN = 0;
+      if ((avg > 20 || avgWork > 9) && this.quality > 0.55) {
         this.quality = Math.max(0.5, this.quality - 0.15);
         try { localStorage.setItem(QUALITY_KEY, String(this.quality)); } catch (e) {}
         this.resize();

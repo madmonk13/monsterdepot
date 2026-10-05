@@ -17,19 +17,26 @@
 
   P.render = function (dt) {
     const c = this.c, z = this.zoom * this.dpr;
-    c.setTransform(1, 0, 0, 1, 0, 0);
-    c.fillStyle = '#0d0b14';
-    c.fillRect(0, 0, this.cv.width, this.cv.height);
-    const sx = (Math.random() - 0.5) * this.shakeAmt, sy = (Math.random() - 0.5) * this.shakeAmt;
-    c.setTransform(z, 0, 0, z, (-this.cam.x + sx) * z, (-this.cam.y + sy) * z);
     const W = this.world, cam = this.cam, t = this.t;
+    const cw = this.cv.width, ch = this.cv.height;
+    W.setScale(z);
+    W.flush(dt);
+    // Snap the camera to whole device pixels so the terrain copy is 1:1.
+    const sx = (Math.random() - 0.5) * this.shakeAmt, sy = (Math.random() - 0.5) * this.shakeAmt;
+    const ox = Math.round((cam.x - sx) * z), oy = Math.round((cam.y - sy) * z);
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    if (!W.covers(ox, oy, cw, ch)) {
+      c.fillStyle = '#0d0b14';
+      c.fillRect(0, 0, cw, ch);
+    }
+    W.drawTerrain(c, ox, oy, cw, ch);
+    c.setTransform(z, 0, 0, z, -ox, -oy);
 
-    W.drawGround(c, cam, this.vw, this.vh);
     W.drawLiquids(c, cam, this.vw, this.vh, t);
+    W.drawShaking(c);
     if (this.flags) this.drawBases(c);
     for (const m of this.mines) this.drawMine(c, m);
     for (const p of this.pickups) this.drawPickup(c, p);
-    W.drawObstacles(c, cam, this.vw, this.vh, t, dt);
 
     const order = this.fighters.filter((f) => f.alive).sort((a, b) => (a.type === 'bat') - (b.type === 'bat') || a.y - b.y);
     for (const f of order) this.drawFighter(c, f);
@@ -377,10 +384,7 @@
     panel(c, x0, y, w, h);
     const px = right ? x0 + w - 34 : x0 + 34;
     A.circ(c, px, y + 32, 24, 'rgba(255,255,255,0.06)', TEAM[f.team], 2);
-    c.save();
-    c.beginPath(); c.arc(px, y + 32, 23, 0, TAU); c.clip();
-    A.drawMonster(c, f.type, px, y + 34, -Math.PI / 2, 16, this.t, { noShadow: true, colors: f.colors, flash: f.flash > 0 });
-    c.restore();
+    c.drawImage(this.cardPortrait(f), px - 23, y + 9, 46, 46);
     const tx = right ? x0 + 12 : x0 + 68, bw = w - 82;
     c.textAlign = 'left';
     c.fillStyle = '#fff'; c.font = `700 14px ${FONT}`;
@@ -412,6 +416,27 @@
     if (f.isPlayer && f.alive && !compact) {
       pill(f.dashCd > 0 ? `DASH ${f.dashCd.toFixed(1)}` : 'DASH READY', f.dashCd > 0 ? '#777' : '#c79bff');
     }
+  };
+
+  // The card portrait is a small cached image refreshed at ~10fps (or when the
+  // hit flash toggles) instead of a clipped vector redraw every frame.
+  P.cardPortrait = function (f) {
+    const flash = f.flash > 0;
+    let pc = f.portrait;
+    if (pc && pc.flash === flash && this.t - pc.t < 0.1 && pc.dpr === this.dpr) return pc.cv;
+    if (!pc) pc = f.portrait = { cv: document.createElement('canvas') };
+    const px = Math.ceil(46 * this.dpr);
+    if (pc.cv.width !== px) { pc.cv.width = px; pc.cv.height = px; }
+    const c = pc.cv.getContext('2d'), k = px / 46;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, px, px);
+    c.setTransform(k, 0, 0, k, 0, 0);
+    A.drawMonster(c, f.type, 23, 25, -Math.PI / 2, 16, this.t, { noShadow: true, colors: f.colors, flash });
+    c.globalCompositeOperation = 'destination-in';
+    A.circ(c, 23, 23, 23, '#000');
+    c.globalCompositeOperation = 'source-over';
+    Object.assign(pc, { flash, t: this.t, dpr: this.dpr });
+    return pc.cv;
   };
 
   P.drawWeaponBar = function (c) {
