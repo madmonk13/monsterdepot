@@ -90,5 +90,53 @@ MOM.Save = (() => {
     for (const m of state.stable) for (const w of m.weapons) if (MOM.WEAPONS[w.id].builtin) w.ammo = Infinity;
   }
 
-  return { load: () => { load(); normalize(); return state; }, persist, newGame, hasSave, get, makeMonster, stats, slots, worth, addXp, active };
+  // ---------- Transfer between browsers ----------
+  const EXPORT_APP = 'monster-depot';
+
+  function exportData() {
+    return { app: EXPORT_APP, version: 1, exported: new Date().toISOString(), save: state };
+  }
+
+  // Turn an imported file into a clean save. Nothing in the file is trusted:
+  // unknown monsters and weapons are dropped, numbers are clamped, built-in
+  // weapons are rebuilt. Throws with a readable message if it isn't a save.
+  function parseImport(obj) {
+    const src = obj && obj.app === EXPORT_APP ? obj.save : obj;
+    if (!src || typeof src !== 'object' || !Array.isArray(src.stable)) {
+      throw new Error("That file doesn't look like a Monster Depot save.");
+    }
+    const num = (v, d) => (Number.isFinite(+v) && v !== null && v !== '' ? +v : d);
+    const int = (v, lo, hi, d) => Math.min(hi, Math.max(lo, Math.round(num(v, d))));
+    const out = fresh();
+    out.cash = int(src.cash, 0, 1e9, MOM.START_CASH);
+    const rec = src.record || {};
+    for (const k of Object.keys(out.record)) out.record[k] = int(rec[k], 0, 1e9, 0);
+    out.created = int(src.created, 0, 8.64e15, Date.now());
+    const ids = new Set();
+    for (const m of src.stable) {
+      if (out.stable.length >= MOM.MAX_STABLE_LEGACY) break;
+      if (!m || !MOM.MONSTERS[m.type]) continue;
+      const n = makeMonster(m.type, String(m.name || '').trim().slice(0, 18) || MOM.MONSTERS[m.type].name);
+      if (typeof m.id === 'string' && m.id && !ids.has(m.id)) n.id = m.id.slice(0, 40);
+      ids.add(n.id);
+      n.level = int(m.level, 1, 99, 1);
+      n.xp = int(m.xp, 0, MOM.xpForLevel(n.level) - 1, 0);
+      for (const k of Object.keys(n.morphs)) n.morphs[k] = int(m.morphs && m.morphs[k], 0, MOM.MORPHS[k].max, 0);
+      for (const w of Array.isArray(m.weapons) ? m.weapons : []) {
+        const D = w && MOM.WEAPONS[w.id];
+        if (!D || D.builtin || n.weapons.some((x) => x.id === w.id) || n.weapons.length >= slots(n)) continue;
+        n.weapons.push({ id: w.id, ammo: int(w.ammo, 0, 1e6, 0) });
+      }
+      n.wins = int(m.wins, 0, 1e9, 0);
+      n.losses = int(m.losses, 0, 1e9, 0);
+      n.hp = int(m.hp, 0, stats(n).hp, stats(n).hp);
+      out.stable.push(n);
+    }
+    out.active = out.stable.some((m) => m.id === src.active) ? src.active : (out.stable[0] ? out.stable[0].id : null);
+    return out;
+  }
+
+  function replace(newState) { state = newState; persist(); return state; }
+
+  return { load: () => { load(); normalize(); return state; }, persist, newGame, hasSave, get, makeMonster, stats, slots, worth, addXp, active, exportData, parseImport, replace };
 })();

@@ -2,7 +2,10 @@
 window.MOM = window.MOM || {};
 
 MOM.START_CASH = 1500;
-MOM.MAX_STABLE = 4;
+// Kennels in the stable. Saves from before this was lowered may hold up to
+// MAX_STABLE_LEGACY; those monsters are kept, but no new orders until under the limit.
+MOM.MAX_STABLE = 3;
+MOM.MAX_STABLE_LEGACY = 4;
 MOM.HEAL_COST_PER_HP = 2;
 
 // Base stats for each monster in the Depot catalog.

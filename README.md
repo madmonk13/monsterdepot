@@ -12,12 +12,14 @@ Everything is saved automatically in your browser's localStorage, so a reload pi
 - where you were in the menus (screen, tab, arena choices, current challenger);
 - any battle in progress. It's snapshotted every second and when the page is hidden or closed, and comes back paused after a reload. A battle that ended just before the reload still pays out.
 
+To move a game to another browser or computer, use **Transfer Save** on the title screen (or the 💾 button in HQ). **Export Save** downloads a small `.json` file; **Import File…** on the other device loads it, after showing a summary and asking before it overwrites anything.
+
 ## Game loop
 
 - **Catalog** — 12 monsters, each with its own stats and trait (regeneration, flight, venom, nine lives, a pack of pups, built-in eye beam or fire breath, 3 weapon hardpoints…).
 - **Armory** — 7 weapons. Ammo is bought in packs and carries over between fights.
 - **Gene Lab** — permanent stat grafts. Monsters also level up from XP.
-- **Stable** — up to 4 monsters. Damage persists after battle, so heal before the next one.
+- **Stable** — 3 kennels, so up to 3 monsters. Damage persists after battle, so heal before the next one.
 - **Arena** — 4 modes (Survival, Horde, Capture the Flag, Destruction), 4 procedurally generated arenas with destructible terrain, water and lava, and 3 difficulty tiers.
 
 ## Controls

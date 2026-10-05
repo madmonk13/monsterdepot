@@ -144,6 +144,81 @@ MOM.UI = (() => {
     requestAnimationFrame(parade);
   }
 
+  // ---------- Save transfer ----------
+  function saveSummary(st) {
+    const n = st.stable.length;
+    const best = st.stable.reduce((a, m) => (m.level > (a ? a.level : 0) ? m : a), null);
+    return `${n} monster${n === 1 ? '' : 's'} · ${money(st.cash)} · ${st.record.wins}W–${st.record.losses}L` +
+      (best ? ` · best: ${esc(best.name)} (LV ${best.level})` : '');
+  }
+
+  function transferSave() {
+    A.play('click');
+    const st = S.hasSave() ? S.get() || S.load() : null;
+    modal({
+      title: 'Transfer Save',
+      body: `<p>Move your game to another browser or computer: export a save file here, then import it on the other device.</p>
+        ${st ? `<p style="color:var(--muted);font-size:14px">Current save: ${saveSummary(st)}</p>` : '<p style="color:var(--muted);font-size:14px">There is no save on this device yet.</p>'}`,
+      buttons: [
+        { label: 'Close' },
+        { label: 'Import File…', onClick: () => { pickImportFile(); } },
+        ...(st ? [{ label: 'Export Save', cls: 'btn-primary', onClick: () => { exportSave(); } }] : []),
+      ],
+    });
+  }
+
+  function exportSave() {
+    if (battle) saveBattle();
+    const blob = new Blob([JSON.stringify(S.exportData(), null, 1)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `monster-depot-save-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    A.play('buy');
+    toast('💾 Save exported. Import it on your other device.', 'good');
+  }
+
+  function pickImportFile() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = async () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      let incoming;
+      try {
+        if (file.size > 2e6) throw new Error('That file is too large to be a Monster Depot save.');
+        incoming = S.parseImport(JSON.parse(await file.text()));
+      } catch (e) {
+        A.play('error');
+        modal({ title: "Couldn't Import", body: `<p>${esc(e instanceof SyntaxError ? "That file isn't valid save data." : e.message)}</p>`, buttons: [{ label: 'OK', cls: 'btn-primary' }] });
+        return;
+      }
+      const current = S.hasSave() ? S.get() : null;
+      modal({
+        title: 'Import this save?',
+        body: `<p><b>Importing:</b> ${saveSummary(incoming)}</p>
+          ${current ? `<p><b>Replaces:</b> ${saveSummary(current)}</p><p class="warn">Your current game on this device will be overwritten. Export it first if you want to keep it.</p>` : ''}`,
+        buttons: [{ label: 'Cancel' }, { label: 'Import', cls: current ? 'btn-danger' : 'btn-primary', onClick: () => applyImport(incoming) }],
+      });
+    };
+    input.click();
+  }
+
+  function applyImport(incoming) {
+    if (battle) { battle.destroy(); battle = null; }
+    store.del(BATTLE_KEY);
+    rival = null; rivalKey = '';
+    S.replace(incoming);
+    A.play('levelup');
+    showHub(S.active() ? 'stable' : 'catalog');
+    toast('Save imported. Welcome back!', 'good');
+  }
+
   function howTo() {
     modal({
       title: 'How to Play',
@@ -255,7 +330,8 @@ MOM.UI = (() => {
   // ----- Stable -----
   function renderStable(el) {
     const st = S.get();
-    el.innerHTML = `<h2>Your Stable</h2><p class="sub">Up to ${MOM.MAX_STABLE} monsters. Record: ${st.record.wins} wins, ${st.record.losses} losses · Lifetime earnings ${money(st.record.earned)}</p><div class="grid" id="stable-grid"></div>`;
+    const over = st.stable.length > MOM.MAX_STABLE;
+    el.innerHTML = `<h2>Your Stable</h2><p class="sub">${st.stable.length}/${MOM.MAX_STABLE} kennels used.${over ? ` <span class="warn">You're over the ${MOM.MAX_STABLE}-kennel limit — your monsters stay, but you can't order more until you're back under it.</span>` : ''} Record: ${st.record.wins} wins, ${st.record.losses} losses · Lifetime earnings ${money(st.record.earned)}</p><div class="grid" id="stable-grid"></div>`;
     const g = $('#stable-grid', el);
     for (const m of st.stable) {
       const d = MOM.MONSTERS[m.type], active = S.active() === m;
@@ -655,6 +731,8 @@ MOM.UI = (() => {
       else go();
     };
     $('#btn-howto').onclick = () => { A.init(); A.play('click'); howTo(); };
+    $('#btn-transfer').onclick = () => { A.init(); transferSave(); };
+    $('#btn-transfer-hub').onclick = () => { A.init(); transferSave(); };
     $('#brand-home').onclick = () => { A.play('click'); showTitle(); };
     $('#btn-sound').onclick = () => { A.init(); A.setMuted(!A.isMuted()); $('#btn-sound').textContent = A.isMuted() ? '🔇' : '🔊'; A.play('click'); };
     $$('#tabs button').forEach((b) => b.onclick = () => { A.play('click'); tab = b.dataset.tab; renderHub(); $('#screen-hub').scrollTop = 0; });
