@@ -1,6 +1,6 @@
-# Mail Order Monsters (web remake)
+# Monster Depot
 
-A single-player, browser-based take on the 1986 classic. Order a monster from the catalog, bolt on weapons, graft on mutations, and send it into the arena.
+A single-player browser game: order a monster from the catalog, bolt on weapons, graft on mutations, and send it into the arena.
 
 ## Play
 
@@ -14,7 +14,7 @@ Everything is saved automatically in your browser's localStorage, so a reload pi
 
 ## Game loop
 
-- **Catalog** — 9 monsters, each with its own stats and trait (regeneration, flight, venom, built-in eye beam, 3 weapon hardpoints…).
+- **Catalog** — 12 monsters, each with its own stats and trait (regeneration, flight, venom, nine lives, a pack of pups, built-in eye beam or fire breath, 3 weapon hardpoints…).
 - **Armory** — 7 weapons. Ammo is bought in packs and carries over between fights.
 - **Gene Lab** — permanent stat grafts. Monsters also level up from XP.
 - **Stable** — up to 4 monsters. Damage persists after battle, so heal before the next one.

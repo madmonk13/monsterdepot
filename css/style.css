@@ -81,8 +81,7 @@ button { font-family: inherit; }
   text-shadow: 0 6px 0 #7a1f55, 0 12px 40px rgba(255, 79, 163, .45);
 }
 .logo span:nth-child(1) { color: var(--yellow); }
-.logo span:nth-child(2) { color: var(--cyan); font-size: .72em; }
-.logo span:nth-child(3) { color: #fff; }
+.logo span:nth-child(2) { color: #fff; }
 .tagline { color: #d9d2f0; font-size: 18px; line-height: 1.5; margin: 22px 0 28px; }
 .title-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .fineprint { color: var(--muted); font-size: 12px; margin-top: 26px; }

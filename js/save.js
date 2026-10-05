@@ -40,7 +40,7 @@ MOM.Save = (() => {
       weapons: [], // { id, ammo }
       wins: 0, losses: 0,
     };
-    if (type === 'cyclops') m.weapons.push({ id: 'eye', ammo: Infinity });
+    if (d.builtin) m.weapons.push({ id: d.builtin, ammo: Infinity });
     m.hp = stats(m).hp;
     return m;
   }

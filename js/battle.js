@@ -6,6 +6,7 @@
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const angDiff = (a, b) => { let d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const lavaProof = (f) => f.type === 'bat' || f.type === 'mech' || f.type === 'dragon';
 
   const GREMLIN = {
     grunt:   { r: 14, hp: 18, spd: 150, colors: { p: '#8a9a3a', s: '#5a6a20', a: '#ffde3b', d: '#2a3410' } },
@@ -47,6 +48,7 @@
         this.rival.ang = Math.PI;
         this.fighters.push(this.rival);
       }
+      if (!cfg.restore) for (const f of this.fighters.slice()) this.addPack(f);
       this.reach = W.bfs(W.spawnA.tx, W.spawnA.ty, false);
 
       if (this.mode === 'ctf') {
@@ -108,6 +110,7 @@
         x: f.x, y: f.y, ang: f.ang, hp: f.hp, alive: f.alive, respawnT: f.respawnT || 0, sel: f.sel,
         slowT: Math.max(0, f.slowT), poisonT: Math.max(0, f.poisonT), dashCd: Math.max(0, f.dashCd),
         weapons: f.weapons.map((w) => ({ id: w.id, ammo: w.ammo === Infinity ? -1 : w.ammo })),
+        lifeUsed: !!f.lifeUsed,
       });
       return {
         v: 1,
@@ -118,7 +121,7 @@
         timeLeft: this.timeLeft, wave: this.wave, waveSpawn: this.waveSpawn, waveTotal: this.waveTotal, spawnT: this.spawnT, bossT: this.bossT,
         player: fs(this.player),
         rival: this.rival ? fs(this.rival) : null,
-        minions: this.fighters.filter((f) => f.minion && f.alive).map((f) => ({ ...fs(f), kind: f.kind, maxHp: f.maxHp, spd: f.spd })),
+        minions: this.fighters.filter((f) => f.minion && f.alive).map((f) => ({ ...fs(f), kind: f.kind, team: f.team, leader: ref(f.leader), maxHp: f.maxHp, spd: f.spd })),
         flags: this.flags ? this.flags.map((fl) => ({ x: fl.x, y: fl.y, atHome: fl.atHome, dropT: fl.dropT, carrier: ref(fl.carrier) })) : null,
         pickups: this.pickups.map((p) => ({ x: p.x, y: p.y, kind: p.kind, life: p.life })),
         mines: this.mines.map((m) => ({ x: m.x, y: m.y, team: m.team, owner: ref(m.owner), arm: m.arm, life: m.life })),
@@ -133,7 +136,7 @@
       this.score = s.score.slice();
       this.lastCount = Math.ceil(this.introT - 0.5) + 1;
       const setF = (f, d) => {
-        Object.assign(f, { x: d.x, y: d.y, ang: d.ang, hp: d.hp, hpLag: d.hp, alive: d.alive, respawnT: d.respawnT, sel: d.sel, slowT: d.slowT, poisonT: d.poisonT, dashCd: d.dashCd });
+        Object.assign(f, { x: d.x, y: d.y, ang: d.ang, hp: d.hp, hpLag: d.hp, alive: d.alive, respawnT: d.respawnT, sel: d.sel, slowT: d.slowT, poisonT: d.poisonT, dashCd: d.dashCd, lifeUsed: !!d.lifeUsed });
         f.weapons = d.weapons.map((w) => ({ id: w.id, ammo: w.ammo == null || w.ammo < 0 ? Infinity : w.ammo, cd: 0 }));
         if (!f.alive) f.deadT = 0;
       };
@@ -144,8 +147,11 @@
         this.fighters.push(this.boss);
       }
       if (this.rival && s.rival) setF(this.rival, s.rival);
+      const leaderOf = (r) => (r === 'p' ? this.player : r === 'r' ? this.rival : null);
       for (const d of s.minions) {
-        const f = this.makeMinion(d.x, d.y, d.kind);
+        const leader = leaderOf(d.leader);
+        if (d.kind === 'pup' && !leader) continue;
+        const f = d.kind === 'pup' ? this.makePup(leader, 0) : this.makeMinion(d.x, d.y, d.kind);
         setF(f, d);
         f.maxHp = d.maxHp; f.spd = d.spd;
         this.fighters.push(f);
@@ -182,7 +188,7 @@
     }
 
     makeAI(f) {
-      const ranged = f.weapons.some((w) => w.ammo > 0 && !['flame', 'roar', 'mine'].includes(w.id));
+      const ranged = f.weapons.some((w) => w.ammo > 0 && MOM.WEAPONS[w.id].kind === 'proj');
       return {
         style: ranged && f.str < 13 ? 'gunner' : 'brawler',
         strafe: Math.random() < 0.5 ? -1 : 1, strafeT: 1,
@@ -206,6 +212,36 @@
       };
       f.hpLag = f.hp;
       return f;
+    }
+
+    // Barghest's pups: small allied minions that follow their leader.
+    makePup(leader, i) {
+      const a = leader.ang + Math.PI + (i ? 0.7 : -0.7);
+      const hp = Math.round(34 + leader.level * 6);
+      const f = {
+        team: leader.team, isPlayer: false, minion: true, kind: 'pup', leader, slot: i,
+        type: 'dog', name: 'Pup', level: 1,
+        x: leader.x + Math.cos(a) * 44, y: leader.y + Math.sin(a) * 44, vx: 0, vy: 0, kbx: 0, kby: 0, ang: leader.ang, r: 12,
+        hp, maxHp: hp, str: 5 + leader.level * 0.8, arm: 5, spd: 205, regen: 0,
+        weapons: [], sel: 0,
+        meleeCd: rand(0, 0.7), atk: 0, dashCd: 99, dashT: 0, slowT: 0, poisonT: 0,
+        flash: 0, walk: rand(0, 10), moving: false, alive: true, respawnT: 0,
+        colors: leader.colors || MOM.MONSTERS.dog.colors, dmgDealt: 0,
+      };
+      f.hpLag = f.hp;
+      return f;
+    }
+
+    // Top a dog's pack back up to two pups (battle start and on respawn).
+    addPack(f) {
+      if (f.type !== 'dog' || f.minion) return;
+      const have = this.fighters.filter((p) => p.leader === f && p.alive).map((p) => p.slot);
+      for (const i of [0, 1]) {
+        if (have.includes(i)) continue;
+        const pup = this.makePup(f, i);
+        this.collideTiles(pup);
+        this.fighters.push(pup);
+      }
     }
 
     // ---------- Main loop ----------
@@ -387,7 +423,7 @@
         mul *= f.type === 'wyrm' ? 1.05 : f.type === 'golem' ? 0.4 : 0.55;
         if (f.moving && Math.random() < dt * 6) this.part({ ring: true, x: f.x, y: f.y, r0: f.r * 0.6, r1: f.r * 1.5, life: 0.6, color: 'rgba(200,235,255,0.6)' });
       }
-      if (g === G.LAVA && !flying && f.type !== 'mech') {
+      if (g === G.LAVA && !flying && !lavaProof(f)) {
         mul *= 0.8;
         this.hurt(f, 11 * dt, null, { raw: true, quiet: true });
         if (Math.random() < dt * 14) this.part({ x: f.x + rand(-f.r, f.r), y: f.y + rand(-f.r, f.r), vy: -50, life: 0.5, size: 4, color: '#ffb52e', glow: true });
@@ -580,6 +616,17 @@
 
     kill(o, src) {
       if (!o.alive) return;
+      if (o.type === 'cat' && !o.minion && !o.lifeUsed) {
+        // Nine Lives: the first knockout of the battle doesn't stick.
+        o.lifeUsed = true;
+        o.hp = o.hpLag = Math.round(o.maxHp * 0.3);
+        o.poisonT = 0;
+        this.part({ ring: true, x: o.x, y: o.y, r0: o.r, r1: o.r * 3, life: 0.6, color: 'rgba(255,240,150,0.9)', lw: 5 });
+        this.burst(o.x, o.y, 20, '#ffe08a', 200, 0.7, 4, { glow: true });
+        this.floatText(o.x, o.y - o.r - 20, 'NINE LIVES!', '#ffe08a', 20);
+        MOM.Audio.play('levelup');
+        return;
+      }
       o.alive = false; o.hp = 0; o.deadT = 0.01; o.flash = 0; o.slowT = 0; o.poisonT = 0;
       const col = o.colors ? o.colors.p : MOM.MONSTERS[o.type].colors.p;
       this.burst(o.x, o.y, o.minion ? 18 : 40, col, 260, 0.9, 5);
@@ -590,6 +637,7 @@
       if (!o.minion) this.shake(12);
       if (o.carrying) this.dropFlag(o);
       if (o.minion) {
+        if (o.type !== 'gremlin') return; // pups: no bounty
         this.kills++;
         const pay = Math.round(15 * this.diff.mult);
         this.earned += pay;
@@ -803,7 +851,7 @@
       if (allowDirect && d < 320 && W.los(f.x, f.y, gx, gy) && this.clearPath(f, gx, gy)) {
         return { x: (gx - f.x) / d, y: (gy - f.y) / d };
       }
-      const lava = f.type === 'bat' || f.type === 'mech';
+      const lava = lavaProof(f);
       const field = this.fieldTo(Math.floor(gx / W.T), Math.floor(gy / W.T), lava);
       return this.stepAlong(f, field) || { x: (gx - f.x) / d, y: (gy - f.y) / d };
     }
@@ -813,7 +861,7 @@
       const W = this.world, a = Math.atan2(gy - f.y, gx - f.x);
       const px = -Math.sin(a) * f.r * 0.9, py = Math.cos(a) * f.r * 0.9;
       if (!W.los(f.x + px, f.y + py, gx + px, gy + py) || !W.los(f.x - px, f.y - py, gx - px, gy - py)) return false;
-      if (f.type === 'bat' || f.type === 'mech') return true;
+      if (lavaProof(f)) return true;
       const n = Math.ceil(Math.hypot(gx - f.x, gy - f.y) / 24);
       for (let i = 1; i <= n; i++) if (W.groundAtPx(f.x + (gx - f.x) * i / n, f.y + (gy - f.y) * i / n) === MOM.G.LAVA) return false;
       return true;
@@ -823,7 +871,12 @@
       const ai = f.ai, W = this.world;
       const foes = this.enemiesOf(f);
       let target = null, td = Infinity;
-      for (const o of foes) { const d = dist(f, o); if (d < td) { td = d; target = o; } }
+      // Prefer real monsters over pups unless a pup is right on top of us.
+      let best = Infinity;
+      for (const o of foes) {
+        const d = dist(f, o), score = o.minion && o.kind === 'pup' && d > f.r + o.r + 30 ? d * 3 : d;
+        if (score < best) { best = score; td = d; target = o; }
+      }
 
       let goal = null, fight = !!target;
       if (this.mode === 'ctf') {
@@ -869,7 +922,7 @@
         const l = Math.hypot(mv.x, mv.y) || 1; mv.x /= l; mv.y /= l;
         // Don't strafe into lava or walls.
         const nx = f.x + mv.x * 40, ny = f.y + mv.y * 40;
-        if (W.solidAtPx(nx, ny) || (W.groundAtPx(nx, ny) === MOM.G.LAVA && f.type !== 'bat' && f.type !== 'mech')) { ai.strafe *= -1; mv = this.steerTo(f, target.x, target.y); }
+        if (W.solidAtPx(nx, ny) || (W.groundAtPx(nx, ny) === MOM.G.LAVA && !lavaProof(f))) { ai.strafe *= -1; mv = this.steerTo(f, target.x, target.y); }
       } else {
         const close = engaging ? f.r + target.r + 8 : 6;
         mv = Math.hypot(goal.x - f.x, goal.y - f.y) > close ? this.steerTo(f, goal.x, goal.y) : { x: 0, y: 0 };
@@ -954,8 +1007,11 @@
     }
 
     controlMinion(f, dt) {
-      const p = this.player, W = this.world;
-      if (!p.alive) { f.mx = f.my = 0; return; }
+      if (f.kind === 'pup') return this.controlPup(f, dt);
+      const W = this.world;
+      let p = null, pd = Infinity;
+      for (const o of this.enemiesOf(f)) { const d = dist(f, o); if (d < pd) { pd = d; p = o; } }
+      if (!p) { f.mx = f.my = 0; return; }
       const d = dist(f, p);
       const vis = d < 400 && W.los(f.x, f.y, p.x, p.y);
       let mv;
@@ -985,6 +1041,36 @@
       }
     }
 
+    // Pups chase foes near their leader, otherwise trot along behind it.
+    controlPup(f, dt) {
+      const L = f.leader, W = this.world;
+      const anchor = L && L.alive ? L : f;
+      let target = null, td = Infinity;
+      for (const o of this.enemiesOf(f)) {
+        if (dist(o, anchor) > 320) continue;
+        const d = dist(f, o);
+        if (d < td) { td = d; target = o; }
+      }
+      let gx, gy, close;
+      if (target) { gx = target.x; gy = target.y; close = f.r + target.r + 6; }
+      else if (L && L.alive) {
+        const a = L.ang + Math.PI + (f.slot ? 0.7 : -0.7);
+        gx = L.x + Math.cos(a) * (L.r + 26); gy = L.y + Math.sin(a) * (L.r + 26); close = 14;
+      } else { f.mx = f.my = 0; return; }
+      const d = Math.hypot(gx - f.x, gy - f.y);
+      let mv = { x: 0, y: 0 };
+      if (d > close) {
+        if (d < 220 && this.clearPath(f, gx, gy)) mv = { x: (gx - f.x) / d, y: (gy - f.y) / d };
+        else mv = this.stepAlong(f, this.fieldTo(Math.floor(gx / W.T), Math.floor(gy / W.T), false)) || { x: (gx - f.x) / d, y: (gy - f.y) / d };
+      }
+      // Ease off when just tagging along so pups don't jitter at the heel.
+      const k = target ? 1 : Math.min(1, d / 60);
+      f.mx = mv.x * k; f.my = mv.y * k;
+      const want = target ? Math.atan2(target.y - f.y, target.x - f.x) : (f.mx || f.my) ? Math.atan2(f.my, f.mx) : f.ang;
+      f.ang += angDiff(f.ang, want) * Math.min(1, dt * 8);
+      if (target && td < f.r + target.r + 14) this.melee(f);
+    }
+
     updateDead(f, dt) {
       if (f.deadT > 0) f.deadT += dt;
       if (f.minion && f.deadT > 0.6) f.deadT = 0;
@@ -998,6 +1084,7 @@
           f.poisonT = 0; f.slowT = 0;
           this.part({ ring: true, x: f.x, y: f.y, r0: 50, r1: 5, life: 0.4, color: 'rgba(255,255,255,0.8)', lw: 4 });
           if (f.isPlayer) MOM.Audio.play('pickup');
+          this.addPack(f);
         }
       }
     }
@@ -1121,6 +1208,7 @@
           this.boss.name = this.cfg.rival.name;
           this.rival = this.boss;
           this.fighters.push(this.boss);
+          this.addPack(this.boss);
           this.shake(10);
           MOM.Audio.play('roar');
           this.say('THE BRUTE APPEARS!', `${this.boss.name} the ${MOM.MONSTERS[this.boss.type].name}`, '#ff4f4f', 2.2);

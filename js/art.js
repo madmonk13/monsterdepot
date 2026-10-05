@@ -236,6 +236,97 @@ MOM.Art = (() => {
       line(c, [-5, 4, 2, 4], P.s, 1);
     },
 
+    cat(c, P, t, w, atk) {
+      const s = Math.sin(w);
+      const tw = Math.sin(t * 3) * 6;
+      line(c, [-14, 0, -24, tw * 0.5, -33, tw], P.d, 7);
+      line(c, [-14, 0, -24, tw * 0.5, -33, tw], P.p, 4.5);
+      circ(c, -33, tw, 2.6, P.s);
+      ell(c, 8 + s * 5, -10, 5, 3.5, 0, P.s, P.d, 1.5);
+      ell(c, 8 - s * 5, 10, 5, 3.5, 0, P.s, P.d, 1.5);
+      ell(c, -9 - s * 5, -10, 5, 3.5, 0, P.s, P.d, 1.5);
+      ell(c, -9 + s * 5, 10, 5, 3.5, 0, P.s, P.d, 1.5);
+      ell(c, -2, 0, 17, 10, 0, P.p, P.d);
+      for (let i = 0; i < 4; i++) {
+        line(c, [-13 + i * 6, -9, -11 + i * 6, -3], P.s, 2.2);
+        line(c, [-13 + i * 6, 9, -11 + i * 6, 3], P.s, 2.2);
+      }
+      const hx = 15 + atk * 5;
+      poly(c, [hx - 3, -5, hx - 6, -14, hx + 3, -8], P.p, P.d, 1.5);
+      poly(c, [hx - 3, 5, hx - 6, 14, hx + 3, 8], P.p, P.d, 1.5);
+      poly(c, [hx - 3, -7, hx - 4.5, -11.5, hx + 0.5, -8], '#ff9fb2');
+      poly(c, [hx - 3, 7, hx - 4.5, 11.5, hx + 0.5, 8], '#ff9fb2');
+      circ(c, hx, 0, 9, P.p, P.d);
+      line(c, [hx + 6, -2.5, hx + 13, -2 - atk * 2], '#fff', 2.6);
+      line(c, [hx + 6, 2.5, hx + 13, 2 + atk * 2], '#fff', 2.6);
+      eye(c, hx + 3, -4, 2.3, P.a, true);
+      eye(c, hx + 3, 4, 2.3, P.a, true);
+      circ(c, hx + 8.5, 0, 1.6, '#ff8fa3');
+      line(c, [hx + 7, -1.5, hx + 13, -6], 'rgba(255,255,255,0.6)', 0.8);
+      line(c, [hx + 7, 1.5, hx + 13, 6], 'rgba(255,255,255,0.6)', 0.8);
+    },
+
+    dog(c, P, t, w, atk) {
+      const s = Math.sin(w);
+      const wag = Math.sin(t * 14) * 5;
+      line(c, [-15, 0, -22, wag * 0.5, -28, wag], P.d, 6.5);
+      line(c, [-15, 0, -22, wag * 0.5, -28, wag], P.s, 4);
+      ell(c, 9 + s * 5, -10, 5, 3.5, 0, P.s, P.d, 1.5);
+      ell(c, 9 - s * 5, 10, 5, 3.5, 0, P.s, P.d, 1.5);
+      ell(c, -9 - s * 5, -10, 5, 3.5, 0, P.s, P.d, 1.5);
+      ell(c, -9 + s * 5, 10, 5, 3.5, 0, P.s, P.d, 1.5);
+      ell(c, -2, 0, 16, 11, 0, P.p, P.d);
+      ell(c, -7, -3, 6, 5, 0.4, P.s);
+      ell(c, -5, -2, 9, 3, 0, 'rgba(0,0,0,0.12)');
+      const hx = 14 + atk * 5;
+      ell(c, 8, 0, 3, 9, 0, P.a, P.d, 1.5);
+      for (const y of [-6, 0, 6]) circ(c, 8, y, 1.2, '#ddd');
+      ell(c, hx, 0, 9, 8, 0, P.p, P.d);
+      ell(c, hx + 8, 0, 5.5, 4.5, 0, P.s, P.d, 1.5);
+      if (atk > 0) { line(c, [hx + 9, -3, hx + 13, -2], '#fff', 1.5); line(c, [hx + 9, 3, hx + 13, 2], '#fff', 1.5); }
+      circ(c, hx + 12.5, 0, 2, '#1a1a1a');
+      ell(c, hx - 2, -8, 5.5, 3, -0.5 - Math.sin(t * 5) * 0.1, P.s, P.d, 1.5);
+      ell(c, hx - 2, 8, 5.5, 3, 0.5 + Math.sin(t * 5) * 0.1, P.s, P.d, 1.5);
+      eye(c, hx + 3, -4, 2, P.a, true);
+      eye(c, hx + 3, 4, 2, P.a, true);
+    },
+
+    dragon(c, P, t, w, atk) {
+      const s = Math.sin(w);
+      const flap = Math.sin(t * 5);
+      const span = 26 + flap * 4, sweep = flap * 2;
+      // Tail with a spade tip
+      const tw = Math.sin(t * 2.5 + w * 0.4) * 5;
+      line(c, [-12, 0, -24, tw * 0.4, -36, tw], P.d, 9);
+      line(c, [-12, 0, -24, tw * 0.4, -36, tw], P.p, 6);
+      poly(c, [-35, tw, -40, tw - 5, -46, tw, -40, tw + 5], P.a, P.d, 1.5);
+      ell(c, 7 + s * 4, -11, 5, 3.5, 0, P.s, P.d, 1.5);
+      ell(c, 7 - s * 4, 11, 5, 3.5, 0, P.s, P.d, 1.5);
+      ell(c, -9 - s * 4, -11, 5.5, 4, 0, P.s, P.d, 1.5);
+      ell(c, -9 + s * 4, 11, 5.5, 4, 0, P.s, P.d, 1.5);
+      for (let side = -1; side <= 1; side += 2) {
+        const S = side;
+        poly(c, [
+          4, S * 6, 10 + sweep, S * span * 0.7, 4 + sweep, S * span, -6, S * span * 0.9,
+          -12, S * span * 0.65, -16, S * span * 0.45, -10, S * 8,
+        ], P.s, P.d);
+        line(c, [3, S * 6, 4 + sweep, S * span], P.p, 1.6);
+        line(c, [3, S * 6, -6, S * span * 0.9], P.p, 1.3);
+        line(c, [3, S * 6, -16, S * span * 0.45], P.p, 1.3);
+      }
+      ell(c, -2, 0, 15, 10, 0, P.p, P.d);
+      for (let i = 0; i < 5; i++) poly(c, [-13 + i * 5, -2, -10.5 + i * 5, 0, -13 + i * 5, 2, -15 + i * 5, 0], P.a);
+      const hx = 16 + atk * 5;
+      ell(c, 11, 0, 6, 5, 0, P.p, P.d);
+      poly(c, [hx, -3, hx - 3, -7, hx - 13, -11], '#f4e6c8', P.d, 1.2);
+      poly(c, [hx, 3, hx - 3, 7, hx - 13, 11], '#f4e6c8', P.d, 1.2);
+      ell(c, hx + 2, 0, 9, 7, 0, P.p, P.d);
+      ell(c, hx + 9, 0, 4, 4.5, 0, P.s, P.d, 1.5);
+      circ(c, hx + 11, -2, 0.9, P.d); circ(c, hx + 11, 2, 0.9, P.d);
+      eye(c, hx + 3, -4, 2.2, P.a, true);
+      eye(c, hx + 3, 4, 2.2, P.a, true);
+    },
+
     gremlin(c, P, t, w, atk) {
       const s = Math.sin(w);
       ell(c, -3 - s * 3, -7, 4, 3, 0, P.d);

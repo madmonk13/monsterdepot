@@ -131,8 +131,10 @@ MOM.UI = (() => {
     ];
     for (const r of rows) {
       const types = MOM.MONSTER_ORDER;
-      const gap = r.s * 5.5, span = types.length * gap;
-      for (let i = 0; i < types.length; i++) {
+      // Enough slots to cover the whole width (plus one off each edge), so
+      // the parade spans wide screens instead of wrapping after one lineup.
+      const gap = r.s * 5.5, slots = Math.max(types.length, Math.ceil(w / gap) + 2), span = slots * gap;
+      for (let i = 0; i < slots; i++) {
         let x = ((i * gap + t * r.sp) % span + span) % span - gap;
         if (x > w + gap) continue;
         const bob = Math.sin(t * 6 + i) * 2;
@@ -460,7 +462,9 @@ MOM.UI = (() => {
   // ----- Arena -----
   function makeRival(diffId) {
     const p = S.active(), d = MOM.DIFFICULTIES[diffId], di = MOM.DIFF_ORDER.indexOf(diffId);
-    const type = pick(MOM.MONSTER_ORDER);
+    // Pricier monsters only show up as rivals at higher difficulties.
+    const maxPrice = [700, 950, Infinity][di];
+    const type = pick(MOM.MONSTER_ORDER.filter((id) => MOM.MONSTERS[id].price <= maxPrice));
     const r = S.makeMonster(type, pick(MOM.RIVAL_NAMES));
     r.level = Math.max(1, p.level + d.lvl);
     const pm = Object.values(p.morphs).reduce((a, b) => a + b, 0);
@@ -470,7 +474,7 @@ MOM.UI = (() => {
     const pools = [['spit', 'laser', 'flame'], ['spit', 'laser', 'flame', 'freeze', 'mine', 'roar'], ['laser', 'flame', 'freeze', 'roar', 'rocket', 'mine']];
     const want = [1, Math.random() < 0.5 ? 1 : 2, 2][di] + (type === 'mech' && di > 0 ? 1 : 0);
     const pool = pools[di].slice();
-    while (r.weapons.length < Math.min(S.slots(r), want + (type === 'cyclops' ? 1 : 0)) && pool.length) {
+    while (r.weapons.length < Math.min(S.slots(r), want + (MOM.MONSTERS[type].builtin ? 1 : 0)) && pool.length) {
       const id = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
       r.weapons.push({ id, ammo: MOM.WEAPONS[id].pack * (2 + di) });
     }

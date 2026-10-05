@@ -5,7 +5,7 @@ MOM.START_CASH = 1500;
 MOM.MAX_STABLE = 4;
 MOM.HEAL_COST_PER_HP = 2;
 
-// Base stats for each monster in the mail-order catalog.
+// Base stats for each monster in the Depot catalog.
 // hp: max health, str: melee damage, arm: armor, spd: pixels/sec, r: body radius
 MOM.MONSTERS = {
   ooze: {
@@ -36,6 +36,13 @@ MOM.MONSTERS = {
     trait: 'Twin Blades', traitDesc: 'Melee attacks recover twice as fast.',
     blurb: 'Praying is optional. Slashing is not. A whirlwind of razor forelimbs.',
   },
+  cat: {
+    name: 'Clawdia', species: 'Sabre Cat', price: 575,
+    hp: 80, str: 11, arm: 4, spd: 215, r: 19,
+    colors: { p: '#f0a040', s: '#b8661e', a: '#7dff6a', d: '#5a2e0a' },
+    trait: 'Nine Lives', traitDesc: 'Once per battle, shrugs off a knockout blow and bounces back at 30% HP.',
+    blurb: 'Sabre fangs, a bad attitude and more lives than you have patience. Litter box not included.',
+  },
   bat: {
     name: 'Gloomflap', species: 'Dire Bat', price: 600,
     hp: 70, str: 8, arm: 2, spd: 230, r: 18,
@@ -47,8 +54,15 @@ MOM.MONSTERS = {
     name: 'Oculus', species: 'Cave Cyclops', price: 650,
     hp: 110, str: 11, arm: 6, spd: 155, r: 21,
     colors: { p: '#e0925a', s: '#a65a2e', a: '#ff3b3b', d: '#5a2a10' },
-    trait: 'Eye Beam', traitDesc: 'Built-in ranged beam that never runs out of ammo.',
+    trait: 'Eye Beam', traitDesc: 'Built-in ranged beam that never runs out of ammo.', builtin: 'eye',
     blurb: 'One eye, one beam, one very bad attitude. Ammo not required.',
+  },
+  dog: {
+    name: 'Barghest', species: 'Dire Hound', price: 725,
+    hp: 105, str: 11, arm: 6, spd: 190, r: 20,
+    colors: { p: '#8a6a4a', s: '#5a4430', a: '#ff4a2e', d: '#2a1e12' },
+    trait: 'Pack Leader', traitDesc: 'Arrives with two loyal pups that fight by its side.',
+    blurb: "A very good boy, technically. Comes with two pups who haven't learned to share either.",
   },
   rex: {
     name: 'Rexbane', species: 'Tyrannosaur', price: 700,
@@ -71,8 +85,15 @@ MOM.MONSTERS = {
     trait: 'Hardpoints', traitDesc: 'Carries 3 weapons and is immune to lava.',
     blurb: 'Factory-fresh battle chassis. Batteries (and hostility) included.',
   },
+  dragon: {
+    name: 'Scorchmaw', species: 'Fire Drake', price: 1200,
+    hp: 145, str: 15, arm: 10, spd: 160, r: 25,
+    colors: { p: '#3a5fc8', s: '#22397e', a: '#ffc23f', d: '#101c40' },
+    trait: 'Fire Breath', traitDesc: 'Built-in flame breath that never runs out. Immune to lava.', builtin: 'breath',
+    blurb: 'Our premium model. Ships in a fireproof crate. Please remove all flammables from the delivery area.',
+  },
 };
-MOM.MONSTER_ORDER = ['ooze', 'wyrm', 'spider', 'mantis', 'bat', 'cyclops', 'rex', 'golem', 'mech'];
+MOM.MONSTER_ORDER = ['ooze', 'wyrm', 'spider', 'mantis', 'cat', 'bat', 'cyclops', 'rex', 'dog', 'golem', 'mech', 'dragon'];
 
 // Ranged weapons. kind: proj | flame | mine | roar
 MOM.WEAPONS = {
@@ -110,6 +131,12 @@ MOM.WEAPONS = {
     name: 'Sonic Roar', price: 550, kind: 'roar', pack: 10, packPrice: 90,
     cd: 1.4, dmg: 13, splash: 150, color: '#c79bff',
     desc: 'A deafening shockwave that blasts everything nearby away.',
+  },
+  // Built in to Scorchmaw — never sold.
+  breath: {
+    name: 'Fire Breath', price: 0, kind: 'flame', pack: 0, packPrice: 0, builtin: true,
+    cd: 0.06, speed: 300, dmg: 1.4, life: 0.38, rad: 9, color: '#ff8a1f',
+    desc: 'Built-in flame breath. Infinite fuel.',
   },
   // Built in to Oculus — never sold.
   eye: {

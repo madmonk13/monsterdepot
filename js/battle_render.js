@@ -54,7 +54,7 @@
 
   P.drawFighter = function (c, f) {
     const team = TEAM[f.team];
-    if (!f.minion) {
+    if (!f.minion || f.kind === 'pup') {
       c.strokeStyle = team; c.globalAlpha = 0.55; c.lineWidth = 2.5;
       c.beginPath(); c.ellipse(f.x, f.y + 3, f.r + 5, (f.r + 5) * 0.8, 0, 0, TAU); c.stroke();
       c.globalAlpha = 1;
@@ -456,7 +456,7 @@
       if (s.melee) {
         const cd = clamp(p.meleeCd / (p.type === 'mantis' ? 0.26 : 0.5), 0, 1);
         c.fillStyle = '#fff'; c.font = `700 13px ${FONT}`;
-        c.fillText(p.type === 'mantis' ? 'SLASH' : p.type === 'golem' || p.type === 'cyclops' ? 'POUND' : 'BITE', x + 10, y + 18);
+        c.fillText(p.type === 'mantis' ? 'SLASH' : p.type === 'cat' ? 'SWIPE' : p.type === 'golem' || p.type === 'cyclops' ? 'POUND' : 'BITE', x + 10, y + 18);
         c.fillStyle = '#9a95b0'; c.font = `600 10px ${FONT}`;
         c.fillText(`STR ${p.str}  •  SPACE`, x + 10, y + 36);
         if (cd > 0) { c.fillStyle = 'rgba(255,255,255,0.15)'; rr(c, x, y + ch - 4, cw * cd, 4, 2); c.fill(); }
@@ -511,7 +511,7 @@
     }
     for (const f of this.fighters) {
       if (!f.alive) continue;
-      A.circ(c, x0 + f.x * k, y0 + f.y * k, f.minion ? 2 : 3.5, f.isPlayer ? '#ffffff' : f.minion ? '#c46be0' : TEAM[1], f.isPlayer ? TEAM[0] : null, 1.5);
+      A.circ(c, x0 + f.x * k, y0 + f.y * k, f.minion ? 2 : 3.5, f.isPlayer ? '#ffffff' : f.kind === 'pup' ? TEAM[f.team] : f.minion ? '#c46be0' : TEAM[1], f.isPlayer ? TEAM[0] : null, 1.5);
     }
   };
 })();
